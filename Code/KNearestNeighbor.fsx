@@ -31,21 +31,22 @@ type DataSet = Data seq
 
 // Two steps: assignment and Update
 
+//luckily for us all points will be floats (damnit)
 // Function to calculate Euclidean Distance D(x,y)
-let EuclideanDistance (point1 : int[], point2 : int[] ) point1, point2 : int32 = 
-    sqrt( ( point1.[0] - point2.[0] )**2 
-        + ( point1.[1] - point2.[1] )**2  
-        )
+let EuclideanDistance (point1 : int[]) (point2 : int[]) = 
+    sqrt( ( point1.[0] - point2.[0] )**2 //you can't to power operations on int (can't have fractions) 
+        + ( point1.[1] - point2.[1] )**2 //also can't do sqrt on int
+        )                                //until this thinks EuclideanDistance is correct you'll get the same error on 46
    
 
 // Function to read in data points
 
 // Implementations
-let pointExample1 = [|0, 0|];
-let pointExample2 = [|3, 4|];
-let distance = EuclideanDistance point1, point2
+let pointExample1 = [|0.; 0.|];
+let pointExample2 = [|3.; 4.|];
+let distance = EuclideanDistance 
 
-printfn distance
+printfn "%A" (distance pointExample1 pointExample1)
 
 //-----------------------------------------------------------------------------------------------------
 // END OF CODE
