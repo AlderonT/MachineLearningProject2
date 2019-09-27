@@ -4,13 +4,18 @@ printfn "Hello World"
 let A = [|0.1;0.2;0.9;1.4|]
 let B = [|0.3;1.2;3.9;1.4|]
 
+let pointSet = [A;B] 
+let NPoints = [[|0.0;0.0;0.0;0.0|]; [|1.0;1.0;1.0;1.0|]]
+
+
 let distance (A :float seq) (B : float seq) = 
     Seq.zip A B 
     |> Seq.sumBy (fun (a,b) -> (a-b)*(a-b)) 
     |> sqrt
 
 let midpoint (ps :float array seq) = 
-   Array.init (ps|>Seq.head|>Array.length) (fun i -> 
+   let tupleSize = ps|>Seq.head|>Array.length 
+   Array.init tupleSize (fun i -> 
       ps|>Seq.averageBy (fun x -> x.[i])
    )   
 
@@ -21,6 +26,15 @@ type Cluster = {
     centroid : float []
     points : float [] Set
 }
+
+//NNearestNeighbor -  cost = [Training Set Size]*log(k)*[Sample Set Size] where k <= [Training Set Size] 
+//A B C D E < Training k = 3; cost = [Training Set Size]*log(k)*[Sample Set Size]
+
+let sortIntoNGroups pointSet NPoints = //get asequence of tuples of each nPoint and a list of the points that are "closest" to it
+    pointSet
+    |> Seq.map (fun pS -> NPoints |> Seq.minBy (fun nP -> distance nP pS),pS)
+    |> Seq.groupBy fst 
+    |> Seq.map (fun (nP,pSs) -> nP,(pSs|>Seq.map snd|>Seq.toArray))
 
 let fetchTrainingSet filePath isCommaSeperated hasHeader =
     System.IO.File.ReadAllLines(filePath) // this give you back a set of line from the file (replace with your directory)
