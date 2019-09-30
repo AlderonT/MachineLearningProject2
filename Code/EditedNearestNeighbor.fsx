@@ -3,9 +3,10 @@
 // Chris Major
 // 9/20/19
 //
-// Implementation of the K-Nearest Neighbor Algorithm for classification and regression.
-// Applicable to all six datasets (abalone.data, car.data, foresfires.csv, machine.data, 
-//  segmentation.data, and winequality-red.csv, winequality-white.csv)
+// Implementation of the Edited Nearest Neighbor Algorithm for classification and regression.
+// Applicable to the three classification  datasets (abalone.data, car.data, foresfires.csv, 
+//  machine.data) 
+//
 //
 //-----------------------------------------------------------------------------------------------------
 
@@ -37,15 +38,26 @@ let midpoint (A : float seq) (B : float seq) =
     |> Seq.sumBy (fun (a,b) -> (a - b) ** 2.0)
     |> sqrt
 
+// Function to implement the Edited Nearest Neighbor Algorithm
+let EditedNearestNeighbor (x : float seq) = 
+    Seq.init D.length ( fun i -> D
+        |> Seq.map(fun x' -> dist(x' , D.[i]), D.[i], x')
+        |> Seq.filter( fun (d, _, _) -> d <> 0)
+        |> Seq.minBy fst
+        |> (fun(d, p, x') -> if p.[class] <> x'.[class] then Some p else None)      // Fill in class later
+    )
+    |> Seq.filler (fun p -> Some p)
+
+
 
 // Function to read in data points
 
-// Implementations (Test)
-let pointExample1 = [|0.0 ; 0.0; 0.0|];
-let pointExample2 = [|3.0 ; 4.0; 5.0|];
-let result = EuclideanDistance pointExample1 pointExample2
 
-printfn "%A" result
+// Implementation
+vs
+|> Seq.map( fun x -> KNearestNeighbor ts n x)
+
+
 
 //-----------------------------------------------------------------------------------------------------
 // END OF CODE

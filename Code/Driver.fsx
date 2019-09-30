@@ -41,14 +41,20 @@ module Project2 =
         |> fst
     
 
- 
-
     let kNearestNeighborClassification k (trainingSet:ClassifiedPoint[]) =
         { new Classifier with
             member __.classify p = kNearestNeighborClassificationImpl k trainingSet p
         }
 
- 
+    // Implementation of Edited Nearest Neighbor (ENN)
+    //let private editedNearestNeighborClassificationImpl k (trainingSet:ClassifiedPoint[]) (p:Point) =
+        //trainingSet
+        //|> Seq.sortBy (fun tp -> tp.distance p)
+        //|> Seq.take k
+        //|> Seq.map (fun tp -> tp.getClass())
+        //|> Seq.countBy id
+        //|> Seq.maxBy snd
+        //|> fst
 
 
     type KNearestNeighborClassification (k,trainingSet:ClassifiedPoint[]) =
