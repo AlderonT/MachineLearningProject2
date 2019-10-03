@@ -56,6 +56,14 @@ module Project2 =
         //|> Seq.maxBy snd
         //|> fst
 
+    //let editedNearestNeighborClassification k (trainingSet:ClassifiedPoint[]) =
+    //    { new Classifier with
+    //        member __.classify p = kNearestNeighborClassificationImpl k trainingSet p
+    //    }
+
+
+    // Make a standard deviation function [CM]
+    // Return an arary of floats that are the SD of each attribute
 
     type KNearestNeighborClassification (k,trainingSet:ClassifiedPoint[]) =
         member __.classify (p:Point) = kNearestNeighborClassificationImpl k trainingSet p
