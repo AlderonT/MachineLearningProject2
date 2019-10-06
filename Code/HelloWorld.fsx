@@ -76,7 +76,48 @@ midpoint trainingDataSet //midpoint: [|8.319637273; 0.5278205128; 0.2709756098; 
 //            ^    m    ^
 //            #
 
+let movingAverage (windowSize:int) =
+    let window = System.Collections.Generic.Queue ()
+    (fun point -> 
+        if window.Count < windowSize then window.Enqueue point
+        else 
+            window.Dequeue () |> ignore 
+            window.Enqueue point 
+        midpoint window        
+    )
 
+let movingAveragePoints windowSize  points = 
+    let average = movingAverage windowSize
+    points |> Seq.map average
+
+[B;A;B;A;A]|>movingAveragePoints 5|>Seq.toList
+[A;B;A;A;B]|>movingAveragePoints 5|>Seq.toList
+
+#load @"C:\work\snippets\Clipboard.fsx"
+open Clipboard
+
+let A = [|2.0;1.2|]
+let B = [|3.1;2.2|]
+let C = [|4.1;1.1|]
+let D = [|1.1;3.2|]
+
+let TheList = [B;B;C;D;A]
+
+let centroidOfTheList = midpoint TheList
+
+TheList
+|> Seq.sortByDescending (distance centroidOfTheList)
+|>movingAveragePoints 5
+//|> Seq.zip [A;B;C;D;B]
+|> Seq.map ( fun a -> sprintf"%s" (a|>Seq.map (sprintf "%f")|>String.concat "\t"))
+|> String.concat "\n"
+|>toClipboard 
+
+
+
+let f = movingAverage 3
+A
+f B
 
 
 
