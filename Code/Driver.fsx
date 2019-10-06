@@ -1,33 +1,45 @@
+//-------------------------------------------------------------------------------------------------------
+//
+//  CSCI 447 - Machine Learning      
+//  Assignment #2
+//  Chris Major, Farshina Nazrul-Shimim, Tysen Radovich, Allen Simpson
+//
+//  Implementation and demonstration of K-nearest Neighbor (KNN), Edited Nearest Neighbor (ENN),
+//  Condensed Nearest Neighbor (CNN), K-Means Regression, and K-Medoids algorithms.
+//
+//-------------------------------------------------------------------------------------------------------
+
+// Module Declaration for runtime
 module Project2 =
+
 
     // CLASSES
     //---------------------------------------------------------------------------------------------------
 
+    // Class for a Point
     type Point =
         abstract member Attributes: float[]
         abstract member distance: p:Point -> float
 
- 
-
+    // Interface for a point with a given value (inheirits from a Point object)
     type ValuePoint =
         inherit Point
         abstract member getValue: unit -> float
 
- 
-
+     // Interface for a point with a designated classification (inheirits from a Point object)
     type ClassifiedPoint =
         inherit Point
         abstract member getClass: unit -> string
 
  
-
+    // Class for a Classification process output
     type Classifier =
         abstract member classify: p:Point -> string
 
- 
-
+    // Class for a Regression process output
     type Regresser =
         abstract member regress: p:Point -> float
+
 
     // FUNCTIONS
     //---------------------------------------------------------------------------------------------------
@@ -43,7 +55,7 @@ module Project2 =
         |> Seq.maxBy snd
         |> fst
     
-
+    // Function to classify points via KNN
     let kNearestNeighborClassification k (trainingSet:ClassifiedPoint[]) =
         { new Classifier with
             member __.classify p = kNearestNeighborClassificationImpl k trainingSet p
@@ -63,11 +75,13 @@ module Project2 =
         |> Seq.map (fun tp -> tp.getClass())
         |> Seq.countBy id
         |> Seq.maxBy snd
-        |> match trainingSet with
-            | _ -> []
-        // @TODO: Need to find a way to match the point with its actual class and KNN class, then remove it (Chris)
+        //|> match trainingSet with
+        //    | X.[i] -> Seq.append
+        //    | _ -> []
+        // @TODO: Need to find a way to match the point with its actual class and KNN class, then remove it 
+        // Thinking of using a match statement, syntax does not line up so I may have to try something else (Chris)
 
-    
+    // Function to classify points via ENN
     let editedNearestNeighborClassification k (trainingSet:ClassifiedPoint[]) =
         { new Classifier with
             member __.classify p = editedNearestNeighborClassificationImpl k trainingSet p
@@ -83,13 +97,14 @@ module Project2 =
         |> Seq.map (fun tp -> tp.getClass())
         |> Seq.countBy id
         |> Seq.maxBy snd
-        |> match trainingSet with
-            | _ -> []
-        // @TODO: Need to find a way to match the point with its actual class and KNN class, then add it
-        // to a brand new set (Chris)
+        //|> match trainingSet with
+        //    | X.[i] -> Seq.append
+        //    | _ -> []
+        // @TODO: Need to find a way to match the point with its actual class and KNN class, then add it to a new sequence
+        // Again, match syntax does not line up so I may have to try something else (Chris)
 
-    // 
-    let editedNearestNeighborClassification k (trainingSet:ClassifiedPoint[]) =
+    // Function to classify points via CNN 
+    let condensedNearestNeighborClassification k (trainingSet:ClassifiedPoint[]) =
         { new Classifier with
             member __.classify p = condensedNearestNeighborClassificationImpl k trainingSet p
         }
