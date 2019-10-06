@@ -1,6 +1,7 @@
 module Project2 =
 
- 
+    // CLASSES
+    //---------------------------------------------------------------------------------------------------
 
     type Point =
         abstract member Attributes: float[]
@@ -28,8 +29,10 @@ module Project2 =
     type Regresser =
         abstract member regress: p:Point -> float
 
- 
+    // FUNCTIONS
+    //---------------------------------------------------------------------------------------------------
 
+    // K-nearest Neighbor (KNN)
     // this make this function only visible inside the defining module
     let private kNearestNeighborClassificationImpl k (trainingSet:ClassifiedPoint[]) (p:Point) =
         trainingSet
@@ -46,31 +49,50 @@ module Project2 =
             member __.classify p = kNearestNeighborClassificationImpl k trainingSet p
         }
 
-    // Implementation of Edited Nearest Neighbor (ENN)
-    //let private editedNearestNeighborClassificationImpl k (trainingSet:ClassifiedPoint[]) (p:Point) =
-        //trainingSet
-        //|> Seq.sortBy (fun tp -> tp.distance p)
-        //|> Seq.take k
-        //|> Seq.map (fun tp -> tp.getClass())
-        //|> Seq.countBy id
-        //|> Seq.maxBy snd
-        //|> fst
-
-    //let editedNearestNeighborClassification k (trainingSet:ClassifiedPoint[]) =
-    //    { new Classifier with
-    //        member __.classify p = kNearestNeighborClassificationImpl k trainingSet p
-    //    }
-
-
-    // Make a standard deviation function [CM]
-    // Return an arary of floats that are the SD of each attribute
-
     type KNearestNeighborClassification (k,trainingSet:ClassifiedPoint[]) =
         member __.classify (p:Point) = kNearestNeighborClassificationImpl k trainingSet p
         interface Classifier with
             member __.classify p = __.classify p
 
- 
+    // Edited Nearest Neighbor (ENN)
+    // Implementation of Edited Nearest Neighbor
+    let private editedNearestNeighborClassificationImpl k (trainingSet:ClassifiedPoint[]) (p:Point) =
+        trainingSet
+        |> Seq.sortBy (fun tp -> tp.distance p)
+        |> Seq.take k
+        |> Seq.map (fun tp -> tp.getClass())
+        |> Seq.countBy id
+        |> Seq.maxBy snd
+        |> match trainingSet with
+            | _ -> []
+        // @TODO: Need to find a way to match the point with its actual class and KNN class, then remove it (Chris)
+
+    
+    let editedNearestNeighborClassification k (trainingSet:ClassifiedPoint[]) =
+        { new Classifier with
+            member __.classify p = editedNearestNeighborClassificationImpl k trainingSet p
+        }
+
+
+    // Condensed Nearest Neighbor (CNN)
+    // Implementation of Condensed Nearest Neighbor
+    let private condensedNearestNeighborClassificationImpl k (trainingSet:ClassifiedPoint[]) (p:Point) =
+        trainingSet
+        |> Seq.sortBy (fun tp -> tp.distance p)
+        |> Seq.take k
+        |> Seq.map (fun tp -> tp.getClass())
+        |> Seq.countBy id
+        |> Seq.maxBy snd
+        |> match trainingSet with
+            | _ -> []
+        // @TODO: Need to find a way to match the point with its actual class and KNN class, then add it
+        // to a brand new set (Chris)
+
+    // 
+    let editedNearestNeighborClassification k (trainingSet:ClassifiedPoint[]) =
+        { new Classifier with
+            member __.classify p = condensedNearestNeighborClassificationImpl k trainingSet p
+        }
 
 
     let point attributes =
@@ -150,3 +172,5 @@ let p = Point'.New(0.5,0.5)
 classifier1.classify p
 classifier2.classify p
 classifier3.classify p
+
+// END OF CODE
