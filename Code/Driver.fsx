@@ -18,7 +18,8 @@ module Project2 =
 
     // Class for a Point
     type Point =
-        abstract member Attributes: float[]
+        abstract member RealAttributes: float[]
+        abstract member CatagoricalAttributes: float[]
         abstract member distance: p:Point -> float
 
     // Interface for a point with a given value (inheirits from a Point object)
@@ -136,23 +137,25 @@ module Project2 =
         }
 
 
-    let point attributes =
+    let point rAttributes cAttributes=
         { new Point with
-            member __.Attributes = attributes
+            member __.RealAttributes = rAttributes
+            member __.CatagoricalAttributes= cAttributes
             member __.distance (p:Point) =
-                Seq.zip attributes p.Attributes
+                Seq.zip rAttributes p.RealAttributes
                 |> Seq.sumBy (fun (a,b) -> (a-b)*(a-b))
                 |> sqrt            
         }
 
  
 
-    let classPoint cls attributes =
+    let classPoint cls rAttributes cAttributes =
         { new ClassifiedPoint with
             member __.getClass() = cls
-            member __.Attributes = attributes
+            member __.RealAttributes = rAttributes
+            member __.CatagoricalAttributes= cAttributes
             member __.distance (p:Point) =
-                Seq.zip attributes p.Attributes
+                Seq.zip rAttributes p.RealAttributes
                 |> Seq.sumBy (fun (a,b) -> (a-b)*(a-b))
                 |> sqrt            
         }

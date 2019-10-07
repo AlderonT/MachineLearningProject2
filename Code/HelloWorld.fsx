@@ -1,8 +1,13 @@
 
 printfn "Hello World"
 
-let A = [|0.1;0.2;0.9;1.4|]
-let B = [|0.3;1.2;3.9;1.4|]
+//let A = [|0.1;0.2;0.9;1.4|]
+//let B = [|0.3;1.2;3.9;1.4|]
+
+let A = [|2.0;1.2|]
+let B = [|3.1;2.2|]
+let C = [|4.1;1.1|]
+let D = [|1.1;3.2|]
 
 let pointSet = [A;B] 
 let NPoints = [[|0.0;0.0;0.0;0.0|]; [|1.0;1.0;1.0;1.0|]]
@@ -96,10 +101,6 @@ let movingAveragePoints windowSize  points =
 #load @"C:\work\snippets\Clipboard.fsx"
 open Clipboard
 
-let A = [|2.0;1.2|]
-let B = [|3.1;2.2|]
-let C = [|4.1;1.1|]
-let D = [|1.1;3.2|]
 
 let TheList = [B;B;C;D;A]
 
