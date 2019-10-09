@@ -68,13 +68,42 @@ module Project2 =
 
     // Edited Nearest Neighbor (ENN)
     // Implementation of Edited Nearest Neighbor
-    let private editedNearestNeighborClassificationImpl k (trainingSet:ClassifiedPoint[]) (p:Point) =
-        trainingSet
-        |> Seq.sortBy (fun tp -> tp.distance p)
-        |> Seq.take k
-        |> Seq.map (fun tp -> tp.getClass())
-        |> Seq.countBy id
-        |> Seq.maxBy snd
+    let private condensedNearestNeighborClassificationImpl k (trainingSet:ClassifiedPoint[]) (samplePoints:ClassifiedPoint[]) =
+        samplePoints
+        |> Seq.map (fun p ->
+            trainingSet
+            |> Seq.sortBy (fun tp -> tp.distance p)
+            |> Seq.take k
+            |> Seq.map (fun tp -> tp.getClass())
+            |> Seq.countBy id
+            |> Seq.maxBy snd
+            |> (fun (x,_) -> if p.getClass() = x then Some x else None)
+        )
+        |> Seq.filter (fun (x:string Option) ->  x.IsSome)
+        |> Seq.map (fun x -> x.Value)
+        |> Seq.toList
+
+    let editedNearestNeighborClassificationImpl k (trainingSet:ClassifiedPoint[]) =
+        trainingSet                                 // take the trainingSet
+        |> Seq.mapi ( fun i point ->                // take a point and the index of said point
+            (kNearestNeighborClassification k (     // we are making a kNNclassifier
+                trainingSet                         // using the trainingSet                        //we are taking out the point we are looking at...
+                |> Seq.mapi (fun i x -> (x,i))      // make each point into a point and it's index
+                |> Seq.filter (fun (_,j) -> j<>i)   // make sure the index you are looking at is not our input point
+                |> Seq.map (fun (x,_) -> x)         // take the (point,index) tuple and return just the point
+                |> Seq.toArray)                     // then we make this whole ugly thing into an array again
+                ).classify point                    // then we classify the point in question
+            ) 
+        |> Seq.mapi (fun i x -> (x,i))              // make a tuple of our point and it's index (this is so we can grab the original point's class
+        |> Seq.filter (fun (x,i) ->                 // take the tuple...
+            x <> trainingSet.[i].getClass()         // filter out points that are falsely classified
+        )
+        |> Seq.map (fun (_,i) -> trainingSet.[i])   // return the points from the original trainingSet
+
+        
+
+
+        
         //|> match trainingSet with
         //    | X.[i] -> Seq.append
         //    | _ -> []
@@ -91,17 +120,14 @@ module Project2 =
     // Condensed Nearest Neighbor (CNN)
     // Implementation of Condensed Nearest Neighbor
     let private condensedNearestNeighborClassificationImpl k (trainingSet:ClassifiedPoint[]) (p:Point) =
-        trainingSet
-        |> Seq.sortBy (fun tp -> tp.distance p)
-        |> Seq.take k
-        |> Seq.map (fun tp -> tp.getClass())
-        |> Seq.countBy id
-        |> Seq.maxBy snd
-        //|> match trainingSet with
-        //    | X.[i] -> Seq.append
-        //    | _ -> []
-        // @TODO: Need to find a way to match the point with its actual class and KNN class, then add it to a new sequence
-        // Again, match syntax does not line up so I may have to try something else (Chris)
+        let returnArray = ResizeArray()
+         trainingSet
+         |> Seq.sortBy (fun tp -> tp.distance p)
+         |> Seq.take k
+         |> Seq.map (fun tp -> tp.getClass())
+         |> Seq.countBy id
+         |> Seq.maxBy snd
+         |> (fun (x,_) -> if p.getClass() = x then returnArray.Add(x))
 
     // Function to classify points via CNN 
     let condensedNearestNeighborClassification k (trainingSet:ClassifiedPoint[]) =
