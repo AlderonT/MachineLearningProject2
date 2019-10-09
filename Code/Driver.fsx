@@ -24,6 +24,7 @@ module Project2 =
         abstract member catagoricalAttributes: string[]
         abstract member cls : string option
         abstract member regressionValue : float option
+        abstract member distance: p:Point -> float      //sqrt((Real distance)^2+(CategoricalClassification distance)^2+(CategoricalRegression distance)^2)
 
 
     //type Point =
@@ -62,24 +63,39 @@ module Project2 =
         |> (if hasHeader then Seq.skip 1 else id)
         |> Seq.map (fun line -> line.Split(if isCommaSeperated then ',' else ';') |> Array.map (fun value -> value.Trim())) // this give you an array of elements from the comma seperated fields. We trim to make sure that any white space is removed.
     
+    //let mutable datasetCatagoricalAttributesValues = [|[|""|]|]
+    //let mutable datasetRealAttributeValues = [|[|0.0|]|]
+    //let mutable datasetClasses = [|""|]
+
     let trainingDataset filename (classIndex:int option) (regressionIndex : int option)= 
+        let classIndex,regressionIndex = 
+            match classIndex,regressionIndex with 
+            | None,None     -> -1,-1
+            | None,Some a   -> -1,a 
+            | Some a,None   -> a,-1
+            | Some a,Some b -> a,b
         fetchTrainingSet filename true false
         |> Seq.map (fun p -> 
             {new Point with 
-                member _.cls = match classIndex with | None -> None | Some i -> Some p.[i]
-                member _.regressionValue = match regressionIndex with | None -> None | Some i -> (p.[i] |> System.Double.tryParse)
-                member _.realAttributes = p |> Seq.filterWithIndex (fun i a -> i <> regressionIndex.Value && i <> classIndex.Value) |>Seq.choose System.Double.tryParse |> Seq.toArray
-                member _.catagoricalAttributes = p |> Seq.filterWithIndex (fun i a -> i <> regressionIndex.Value && i <> classIndex.Value) |> Seq.toArray
+                member _.cls = match classIndex with | -1 -> None | i -> Some p.[i]
+                member _.regressionValue = match regressionIndex with | -1 -> None | i -> (p.[i] |> System.Double.tryParse) //Needs to be able to parse ints into floats
+                member _.realAttributes = p |> Seq.filterWithIndex (fun i a -> i <> regressionIndex && i <> classIndex) |>Seq.choose System.Double.tryParse |> Seq.toArray
+                member _.catagoricalAttributes = p |> Seq.filterWithIndex (fun i a -> i <> regressionIndex && i <> classIndex && (System.Double.tryParse a)=None) |> Seq.toArray
             }            
-        )
+        ) |> Seq.toArray
 
-    trainingDataset
-        
+    let processTrainingDataset (points:Point seq) = 
+        let datasetCatagoricalAttributesValues= (points |> Seq.map (fun p -> p.catagoricalAttributes) |> Seq.transpose |>Seq.map (fun aList -> aList |> Seq.distinct|>Seq.toArray)|>Seq.toArray) 
+        let datasetRealAttributeValues= (points|> Seq.map (fun p -> p.realAttributes) |> Seq.transpose |>Seq.map (fun aList -> aList |> Seq.distinct|>Seq.toArray)|>Seq.toArray)
+        let datasetClasses= (points|>Seq.map (fun p -> p.cls)|>Seq.distinct|>Seq.choose id|>Seq.toArray)
+        {|datasetCatagoricalAttributesValues=datasetCatagoricalAttributesValues;datasetRealAttributeValues=datasetRealAttributeValues;datasetClasses=datasetClasses|}
+
+    (trainingDataset "D:\Fall2019\Machine Learning\Project 2\Data\machine.data" None (Some 9) |> Seq.head)|> (fun x -> x.cls,x.regressionValue,x.realAttributes,x.catagoricalAttributes)
 
     let getCatagoricalRegressionDistance (point:Point) (target:Point) =
         attributeList
-        |> Seq.map (fun a -> 
-            ((trainingDataset |>Seq.filter (fun p -> p.caattributes.[a] = point.attributes.[a]) |>Seq.average)/(trainingDataset|>Seq.average) - (fun a -> (trainingDataset|>Seq.filter (fun p -> p.attributes.[a] = target.attributes.[a]) |>Seq.average)/(trainingDataset|>Seq.average))
+        |> Seq.mapi (fun i a -> 
+            ((trainingDataset |>Seq.filter (fun p -> p.catagoricalAttributes.[i] = point.catagoricalAttributes.[i]) |>Seq.average)/(trainingDataset|>Seq.average) - (fun a -> (trainingDataset|>Seq.filter (fun p -> p.attributes.[a] = target.attributes.[a]) |>Seq.average)/(trainingDataset|>Seq.average))
             |> System.Math.Abs
             |> System.Math.Pow p    //p is a predefined tuning factor
         )
@@ -109,7 +125,7 @@ module Project2 =
 
     // K-nearest Neighbor (KNN)
     // this make this function only visible inside the defining module
-    let private kNearestNeighborClassificationImpl k (trainingSet:ClassifiedPoint[]) (p:Point) =
+    let private kNearestNeighborClassificationImpl k (trainingSet:ClassifiedPoint seq) (p:Point) =
         trainingSet
         |> Seq.sortBy (fun tp -> tp.distance p)
         |> Seq.take k
@@ -118,8 +134,11 @@ module Project2 =
         |> Seq.maxBy snd
         |> fst
     
+    
+
     // Function to classify points via KNN
-    let kNearestNeighborClassification k (trainingSet:ClassifiedPoint[]) =
+    let kNearestNeighborClassification k (trainingSet:ClassifiedPoint seq) =
+        let trainingDatasetProperties = processTrainingDataset (trainingSet |> Seq.cast)
         { new Classifier with
             member __.classify p = kNearestNeighborClassificationImpl k trainingSet p
         }
