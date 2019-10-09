@@ -1,3 +1,6 @@
+#load "tools.fsx"
+open Tools
+
 //-------------------------------------------------------------------------------------------------------
 //
 //  CSCI 447 - Machine Learning      
@@ -16,11 +19,17 @@ module Project2 =
     // CLASSES
     //---------------------------------------------------------------------------------------------------
 
-    // Class for a Point
-    type Point =
-        abstract member RealAttributes: float[]
-        abstract member CatagoricalAttributes: float[]
-        abstract member distance: p:Point -> float
+    type Point = 
+        abstract member realAttributes: float[]
+        abstract member catagoricalAttributes: string[]
+        abstract member cls : string option
+        abstract member regressionValue : float option
+
+
+    //type Point =
+    //    abstract member RealAttributes: float[]
+    //    abstract member CatagoricalAttributes: float[]
+    //    abstract member distance: p:Point -> float
 
     // Interface for a point with a given value (inheirits from a Point object)
     type ValuePoint =
@@ -41,9 +50,62 @@ module Project2 =
     type Regresser =
         abstract member regress: p:Point -> float
 
+    ///////////////////////////
+    let fetchTrainingSet filePath isCommaSeperated hasHeader =
+        System.IO.File.ReadAllLines(filePath) // this give you back a set of line from the file (replace with your directory)
+        |> Seq.map (fun v -> v.Trim())
+        |> Seq.filter (System.String.IsNullOrWhiteSpace >> not)
+        |> Seq.filter (fun line ->
+            if isCommaSeperated && line.StartsWith(";") then false 
+            else true
+            )
+        |> (if hasHeader then Seq.skip 1 else id)
+        |> Seq.map (fun line -> line.Split(if isCommaSeperated then ',' else ';') |> Array.map (fun value -> value.Trim())) // this give you an array of elements from the comma seperated fields. We trim to make sure that any white space is removed.
+    
+    let trainingDataset filename (classIndex:int option) (regressionIndex : int option)= 
+        fetchTrainingSet filename true false
+        |> Seq.map (fun p -> 
+            {new Point with 
+                member _.cls = match classIndex with | None -> None | Some i -> Some p.[i]
+                member _.regressionValue = match regressionIndex with | None -> None | Some i -> (p.[i] |> System.Double.tryParse)
+                member _.realAttributes = p |> Seq.filterWithIndex (fun i a -> i <> regressionIndex.Value && i <> classIndex.Value) |>Seq.choose System.Double.tryParse |> Seq.toArray
+                member _.catagoricalAttributes = p |> Seq.filterWithIndex (fun i a -> i <> regressionIndex.Value && i <> classIndex.Value) |> Seq.toArray
+            }            
+        )
 
-    // FUNCTIONS
-    //---------------------------------------------------------------------------------------------------
+    trainingDataset
+        
+
+    let getCatagoricalRegressionDistance (point:Point) (target:Point) =
+        attributeList
+        |> Seq.map (fun a -> 
+            ((trainingDataset |>Seq.filter (fun p -> p.caattributes.[a] = point.attributes.[a]) |>Seq.average)/(trainingDataset|>Seq.average) - (fun a -> (trainingDataset|>Seq.filter (fun p -> p.attributes.[a] = target.attributes.[a]) |>Seq.average)/(trainingDataset|>Seq.average))
+            |> System.Math.Abs
+            |> System.Math.Pow p    //p is a predefined tuning factor
+        )
+        |> Seq.sum
+
+    let Cia (vi:string) (cls: string) (attribIndex:int)= 
+        trainingDataset //Needs to be set on initialization
+        |> Seq.filter (fun cPoint -> cPoint.cls = cls && (cPoint.getAttribute).[attribIndex] = vi)
+        |> Seq.length
+        |> float
+
+    let Ci (vi:string) (attribIndex:int)= 
+        trainingDataset //Needs to be set on initialization
+        |> Seq.filter (fun cPoint -> (cPoint.getAttribute).[attribIndex]=vi)
+        |> Seq.length
+        |> float
+
+    let classificationPercent (i,vi :int*string) (vj :string) = 
+        classList
+        |> Seq.map (fun cls -> System.Math.Pow (((Cia vi a i)/(Ci vi i))-((Cia vj a i )/(Ci vj i))) p) // p needs to be a tuning parameter set on initialization
+        |> Seq.sum
+
+    let getCatagagoricalClassificationDistance (point:Point) (target: ClassifiedPoint) = 
+        attributeList
+        |> Seq.mapi (fun _ i -> classificationPercent (i, (point.getAttributes).[i]) (target.getAttribute).[i])
+        |> Seq.sum
 
     // K-nearest Neighbor (KNN)
     // this make this function only visible inside the defining module
