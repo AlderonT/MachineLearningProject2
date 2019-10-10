@@ -75,6 +75,7 @@ module Project2 =
             ),p)   
         )
         |>Seq.sum
+        |> (fun v -> System.Math.Pow (v,1./p))
 
 
 
@@ -106,6 +107,7 @@ module Project2 =
                 ),p)
         ) 
         |> Seq.sum
+        |> (fun v -> System.Math.Pow (v,1./p))
         
 
     let getCategoricalClassificationDistance (point:Point) (target: Point) (trainingSet:Point seq) p= 
@@ -120,14 +122,37 @@ module Project2 =
             | None,Some a   -> -1,a 
             | Some a,None   -> a,-1
             | Some a,Some b -> a,b
-        fetchTrainingSet filename true false
+        let dataSet = fetchTrainingSet filename true false
+
+        let columns = dataSet|> Seq.transpose|> Seq.toArray
+        let realIndexes,categoricalIndexes = 
+            columns
+            |>Seq.mapi (fun i c -> i,c)
+            |>Seq.filter (fun (i,_) -> i<>regressionIndex && i<> classIndex)
+            |>Seq.map (fun (i,c) ->
+                
+                i,
+                (c
+                 |> Seq.exists (fun v -> 
+                    v
+                    |>System.Double.tryParse 
+                    |> Option.isNone
+                    )
+                )
+            )
+            |>Seq.toArray
+            |>Array.partition snd
+            |>(fun (c,r) -> (r|> Seq.map fst |>Set.ofSeq),(c|>Seq.map fst |>Set.ofSeq))
+            
+
+        dataSet
         |> Seq.map (fun p -> 
             {new Point with 
                 member _.cls = match classIndex with | -1 -> None | i -> Some p.[i]
                 member _.regressionValue = match regressionIndex with | -1 -> None | i -> (p.[i] |> System.Double.tryParse) //Needs to be able to parse ints into floats
-                member _.realAttributes = p |> Seq.filterWithIndex (fun i a -> i <> regressionIndex && i <> classIndex) |>Seq.choose System.Double.tryParse |> Seq.toArray
-                member _.categoricalAttributes = p |> Seq.filterWithIndex (fun i a -> i <> regressionIndex && i <> classIndex && (System.Double.tryParse a)=None) |> Seq.toArray
-                member this.distance (p:Point) (trainingDataSet:Point[])= System.Math.Sqrt((Seq.zip this.realAttributes p.realAttributes|> Seq.sumBy (fun (a,b) -> (a-b)*(a-b)))+(getCategoricalClassificationDistance this p trainingDataSet pValue) + (getCategoricalRegressionDistance this p trainingDataSet pValue) )
+                member _.realAttributes = p |> Seq.filterWithIndex (fun i a -> realIndexes.Contains i) |>Seq.map System.Double.Parse |> Seq.toArray
+                member _.categoricalAttributes = p |> Seq.filterWithIndex (fun i a -> categoricalIndexes.Contains i) |> Seq.toArray
+                member this.distance (p:Point) (trainingDataSet:Point[])= System.Math.Sqrt((Seq.zip this.realAttributes p.realAttributes|> Seq.sumBy (fun (a,b) -> (a-b)*(a-b)))**2.+(getCategoricalClassificationDistance this p trainingDataSet pValue)**2. + (getCategoricalRegressionDistance this p trainingDataSet pValue)**2. )
             }            
         ) |> Seq.toArray
         
@@ -138,8 +163,23 @@ module Project2 =
         let datasetClasses= (points|>Seq.map (fun p -> p.cls)|>Seq.distinct|>Seq.choose id|>Seq.toArray)
         {|datasetCategoricalAttributesValues=datasetCategoricalAttributesValues;datasetRealAttributeValues=datasetRealAttributeValues;datasetClasses=datasetClasses|}
 
-    (trainingDataset "D:\Fall2019\Machine Learning\Project 2\Data\machine.data" None (Some 9) 2. |> Seq.head)|> (fun x -> x.cls,x.regressionValue,x.realAttributes,x.categoricalAttributes)
 
+    let t = (trainingDataset "D:\Fall2019\Machine Learning\Project 2\Data\machine.data" None (Some 9) 2.)
+    
+    let p = t.[2]
+    let p' = {new Point with 
+        member _.cls = p.cls
+        member _.regressionValue = p.regressionValue
+        member _.realAttributes = p.realAttributes
+        member _.categoricalAttributes = [|"cambex"; "470v/7"|]
+        member this.distance (p:Point) (trainingDataSet:Point[])= -1.
+    }
+    
+    p.distance p' t
+
+    t.[2].distance p' t
+    
+    let filename = "D:\Fall2019\Machine Learning\Project 2\Data\machine.data"
     // K-nearest Neighbor (KNN)
     // this make this function only visible inside the defining module
     let private kNearestNeighborClassificationImpl k (trainingSet:ClassifiedPoint seq) (p:Point) =
