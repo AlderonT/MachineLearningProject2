@@ -1,4 +1,4 @@
-#load "tools.fsx"
+﻿#load "tools.fsx"
 open Tools
 
 //-------------------------------------------------------------------------------------------------------
@@ -25,7 +25,7 @@ module Project2 =
         abstract member cls : string option
         abstract member regressionValue : float option
         abstract member distance: p:Point -> trainingDataSet:Point seq-> float      //sqrt((Real distance)^2+(CategoricalClassification distance)^2+(CategoricalRegression distance)^2)
-
+ 
  
     // Class for a Classification process output
     type Classifier =
@@ -98,6 +98,27 @@ module Project2 =
         |> Seq.mapi (fun i a -> classificationPercent (trainingSet|>Seq.toArray) (i,a) target.categoricalAttributes.[i] p)
         |> Seq.sum 
     
+
+
+    type PointImpl = 
+        {
+            realAttributes :float[]
+            categoricalAttributes: string[]
+            cls : string option
+            regressionValue : float option
+            pValue: float
+        }
+        with 
+            member this.distance (p:Point) (trainingDataSet:Point seq) = 
+                System.Math.Sqrt((Seq.zip this.realAttributes p.realAttributes|> Seq.sumBy (fun (a,b) -> (a-b)*(a-b)))**2.+(getCategoricalClassificationDistance this p trainingDataSet this.pValue)**2. + (getCategoricalRegressionDistance this p trainingDataSet this.pValue)**2. )
+            interface Point with 
+                member this.cls = this.cls
+                member this.regressionValue = this.regressionValue
+                member this.realAttributes = this.realAttributes
+                member this.categoricalAttributes = this.categoricalAttributes
+                member this.distance (p:Point) (trainingDataSet:Point seq)= this.distance p trainingDataSet 
+                    
+
     
     ////GET THE DATASET
     let fullDataset filename (classIndex:int option) (regressionIndex : int option) (pValue:float)= 
@@ -132,13 +153,13 @@ module Project2 =
 
         dataSet
         |> Seq.map (fun p -> 
-            {new Point with 
-                member _.cls = match classIndex with | -1 -> None | i -> Some p.[i]
-                member _.regressionValue = match regressionIndex with | -1 -> None | i -> (p.[i] |> System.Double.tryParse) //Needs to be able to parse ints into floats
-                member _.realAttributes = p |> Seq.filterWithIndex (fun i a -> realIndexes.Contains i) |>Seq.map System.Double.Parse |> Seq.toArray
-                member _.categoricalAttributes = p |> Seq.filterWithIndex (fun i a -> categoricalIndexes.Contains i) |> Seq.toArray
-                member this.distance (p:Point) (trainingDataSet:Point seq)= System.Math.Sqrt((Seq.zip this.realAttributes p.realAttributes|> Seq.sumBy (fun (a,b) -> (a-b)*(a-b)))**2.+(getCategoricalClassificationDistance this p trainingDataSet pValue)**2. + (getCategoricalRegressionDistance this p trainingDataSet pValue)**2. )
-            }            
+            {
+                cls = match classIndex with | -1 -> None | i -> Some p.[i]
+                regressionValue = match regressionIndex with | -1 -> None | i -> (p.[i] |> System.Double.tryParse) //Needs to be able to parse ints into floats
+                realAttributes = p |> Seq.filterWithIndex (fun i a -> realIndexes.Contains i) |>Seq.map System.Double.Parse |> Seq.toArray
+                categoricalAttributes = p |> Seq.filterWithIndex (fun i a -> categoricalIndexes.Contains i) |> Seq.toArray
+                pValue = pValue                
+            }:>Point            
         ) |> Seq.toArray
         
 
@@ -258,6 +279,95 @@ module Project2 =
         )
         |> Seq.map (fun (_,i) -> trainingSet.[i])   // return the points from the original trainingSet
 
+    // kMeans = (trainingSet: point seq) -> (k:int) -> ((clusterMean,Cluster):Point*Point seq) seq
+   
+    let private kMeansImpl k (trainingSet:Point seq) =
+        let temp = seq {                                //make a sequence                           //get k memes from T
+            let rnd = System.Random()                   //init randomnumbergenerator
+            let data = ResizeArray(trainingSet)         //convert our dataset to a resizable array
+            let getRandomElement() =                    //Get a random element out of data
+                if data.Count <= 0 then None            //if our data is empty return nothing
+                else
+                    let idx = rnd.Next(0,data.Count)    //get a random index between 0 and |data|
+                    let e = data.[idx]                  //get the element e from idx
+                    data.RemoveAt(idx) |> ignore        //remove the element e from data
+                    Some e                              //return e
+            let rec loop count =                        // this is recursive
+                seq {                                   //we are making a sequence
+                    if count < k then                   //if the current count is lower than k
+                        match getRandomElement() with   //get a random element out of our training set and match it with...
+                        | Some x ->                     //if we get some value
+                            yield x                     //then return said value
+                            yield! loop (count+1)       //and retun the loop
+                        | _ -> ()                       //else return nothing
+                }
+            yield! loop 0                               //call loop with the count of 0 and return the resulting sequence
+        }
+        
+        let firstCentroids = temp|>Seq.toArray              //we are making firstMeans an array so we can modify the means
+            //gets average 
+        let pointsMidpoint (ps :Point seq) =        
+            let realAttributeCount = ps|>Seq.head|>(fun p -> p.realAttributes |>Array.length)
+            let realAttributes = Array.init realAttributeCount (fun i -> 
+                ps|>Seq.averageBy (fun x -> x.realAttributes.[i])
+            )
+            let categoricalAttributeCount = ps|>Seq.head|>(fun p -> p.categoricalAttributes |>Array.length) 
+            let categoricalAttributes = Array.init categoricalAttributeCount (fun i -> 
+                ps|>Seq.map (fun x -> x.categoricalAttributes.[i])|>Seq.countBy id |> Seq.maxBy snd |> fst
+            )
+            let avgRegressionValue = ps|>Seq.averageBy (fun p -> (p.regressionValue|>(fun v -> match v with |None -> 0. |Some v -> v)))
+            let maxClassValue = ps|> Seq.map (fun x -> x.cls)|>Seq.countBy id |> Seq.maxBy snd |> fst
+
+           
+            {
+                cls = maxClassValue
+                regressionValue = Some avgRegressionValue
+                realAttributes = realAttributes
+                categoricalAttributes = categoricalAttributes
+                pValue = (ps|>Seq.head|>unbox<PointImpl>).pValue
+            } :> Point
+
+
+        //this is getting the centroids of the points
+        let getCentroids (centroids:Point seq) (dataset:Point seq) =
+            let epsilon = 0.0001
+            let rec loop (centroids':Point seq) =
+                dataset                                                             //iterate through our data set
+                //|> Seq.map (fun p ->                                                //for each point...
+                //    p,(centroids'|>Seq.minBy (fun c -> (p.distance c trainingSet)))  //make a tuple of p and it's closest centroid   //(point*point) seq
+                //)
+                //|>id
+                |>Seq.groupBy (fun p->centroids'|>Seq.minBy (fun c -> (p.distance c trainingSet)))                                                  //group by the centroids
+                |>Seq.map (fun (m,ps) ->                                            
+                    m,(ps |> pointsMidpoint),ps
+                )
+                |> (fun centroids'' ->
+                    match (centroids''|>Seq.sumBy(fun (oldCentroid,newCentroid,_)->oldCentroid.distance newCentroid dataset)) with 
+                    | v when v > epsilon -> loop (centroids'' |> Seq.map (fun (_,b,_) -> b))
+                    | _ -> (centroids'' |> Seq.map (fun (_,b,c) -> b,c))
+                )
+            loop centroids
+        
+        getCentroids firstCentroids trainingSet //Get the K means...
+        
+    
+    let kMedoids k (trainingSet:Point seq) = 
+        let distortion (point:Point) (targets:Point seq) = 
+            targets
+            |> Seq.sumBy(fun p -> point.distance p trainingSet)
+         
+        kMeansImpl k trainingSet
+        |> Seq.map (fun (m,ps)-> 
+            seq {
+                yield (m,distortion m ps)
+                yield! ps|>Seq.map(fun p -> (p,distortion p ps))
+            }
+            |>Seq.minBy snd
+            |>fst
+        )
+
+    
+    
        
 open Project2
 
@@ -303,6 +413,7 @@ let doKFold k (dataSet:Point seq) (preprocessFunction: (Point seq -> Point seq) 
     )   //Finally lets apply our function above "applyKFold" to our training set and validation set using our preproccess function, lossfunction, and algorithm
     //|> Seq.average                          //the result is a seq of floats so we'll just get the average our % failuresto give us a result to our k-fold analysis as the accuracy of our algorithm
     //Currently an issue 
+
 ///////////////////////////
 
 
@@ -313,13 +424,37 @@ let classifier1 = kNearestNeighborClassification 2 ds
 let classifier2 = KNearestNeighborClassification(2,ds)
 let regressor1 = kNearestNeighborRegression 2 ds
 
- 
+let trainingSet = ds
 
 let p=ds.[1]
- 
-
+let p':Point = 
+    { 
+        cls = p.cls
+        regressionValue = p.regressionValue
+        realAttributes = p.realAttributes
+        categoricalAttributes = p.categoricalAttributes
+        pValue = (p|>unbox<PointImpl>).pValue
+    } |> unbox
+(p = p')
 classifier1.classify ds.[1]
 classifier2.classify p
 regressor1.regress p
 
 // END OF CODE
+
+
+// SPREAD THESE EVERYWHERE! printfn("⣿⣿⣿⡇⠄⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿"); printfn("⣿⣿⣿⡇⠄⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿");printfn("⣿⣿⣿⡇⠄⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿");printfn("⣿⣿⣿⡇⠄⣿⣿⣿⡿⠟⠋⣉⣉⣉⡙⠻⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿");printfn("⣿⣿⣿⠃⠄⠹⠟⣡⣶⡿⢟⣛⣛⡻⢿⣦⣩⣤⣤⣤⣬⡉⢻⣿⣿⣿⣿⣿⣿⣿");printfn("⣿⣿⣿⠄⢀⢤⣾⣿⣿⣿⣿⡿⠿⠿⠿⢮⡃⣛⣛⡻⠿⢿⠈⣿⣿⣿⣿⣿⣿⣿");printfn("⣿⡟⢡⣴⣯⣿⣿⣿⣉⠤⣤⣭⣶⣶⣶⣮⣔⡈⠛⠛⠛⢓⠦⠈⢻⣿⣿⣿⣿⣿");printfn("⠏⣠⣿⣿⣿⣿⣿⣿⣿⣯⡪⢛⠿⢿⣿⣿⣿⡿⣼⣿⣿⣿⣶⣮⣄⠙⣿⣿⣿⣿");printfn("⣼⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⣾⡭⠴⣶⣶⣽⣽⣛⡿⠿⠿⠿⠿⠇⣿⣿⣿⣿");printfn("⣿⣿⣿⣿⣿⣿⣿⠿⠿⣿⣿⣿⣿⣿⣿⣿⣿⣷⣝⣛⢛⡛⢋⣥⣴⣿⣿⣿⣿⣿");printfn("⣿⣿⣿⣿⣿⢿⠱⣿⣿⣛⠾⣭⣛⡿⢿⣿⣿⣿⣿⣿⣿⣿⡀⣿⣿⣿⣿⣿⣿⣿");printfn("⠑⠽⡻⢿⣿⣮⣽⣷⣶⣯⣽⣳⠮⣽⣟⣲⠯⢭⣿⣛⣛⣿⡇⢸⣿⣿⣿⣿⣿⣿");printfn("⠄⠄⠈⠑⠊⠉⠟⣻⠿⣿⣿⣿⣿⣷⣾⣭⣿⣛⠷⠶⠶⠂⣴⣿⣿⣿⣿⣿⣿⣿");printfn("⠄⠄⠄⠄⠄⠄⠄⠄⠁⠙⠒⠙⠯⠍⠙⢉⣉⣡⣶⣶⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿");printfn("⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠙⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿")
+//printf("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⣤⣶⣶⣦⣄⣀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+//⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢰⣿⣿⣿⣿⣿⣿⣿⣷⣦⡀⠀⠀⠀⠀⠀⠀
+//⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⣷⣤⠀⠈⠙⢿⣿⣿⣿⣿⣿⣦⡀⠀⠀⠀⠀
+//⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⣿⣿⣿⠆⠰⠶⠀⠘⢿⣿⣿⣿⣿⣿⣆⠀⠀⠀
+//⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣼⣿⣿⣿⠏⠀⢀⣠⣤⣤⣀⠙⣿⣿⣿⣿⣿⣷⡀⠀
+//⠀⠀⠀⠀⠀⠀⠀⠀⢠⠋⢈⣉⠉⣡⣤⢰⣿⣿⣿⣿⣿⣷⡈⢿⣿⣿⣿⣿⣷⡀
+//⠀⠀⠀⠀⠀⠀⠀⡴⢡⣾⣿⣿⣷⠋⠁⣿⣿⣿⣿⣿⣿⣿⠃⠀⡻⣿⣿⣿⣿⡇
+//⠀⠀⠀⠀⠀⢀⠜⠁⠸⣿⣿⣿⠟⠀⠀⠘⠿⣿⣿⣿⡿⠋⠰⠖⠱⣽⠟⠋⠉⡇
+//⠀⠀⠀⠀⡰⠉⠖⣀⠀⠀⢁⣀⠀⣴⣶⣦⠀⢴⡆⠀⠀⢀⣀⣀⣉⡽⠷⠶⠋⠀
+//⠀⠀⠀⡰⢡⣾⣿⣿⣿⡄⠛⠋⠘⣿⣿⡿⠀⠀⣐⣲⣤⣯⠞⠉⠁⠀⠀⠀⠀⠀
+//⠀⢀⠔⠁⣿⣿⣿⣿⣿⡟⠀⠀⠀⢀⣄⣀⡞⠉⠉⠉⠉⠁⠀⠀⠀⠀⠀⠀⠀⠀
+//⠀⡜⠀⠀⠻⣿⣿⠿⣻⣥⣀⡀⢠⡟⠉⠉⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+//⢰⠁⠀⡤⠖⠺⢶⡾⠃⠀⠈⠙⠋⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+//⠈⠓⠾⠇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀")
