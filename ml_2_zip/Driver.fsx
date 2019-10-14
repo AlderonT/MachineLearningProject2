@@ -551,8 +551,6 @@ let res =
     [3;6;10]
     |>Seq.map (fun k' ->
         
-        let 
-
         [|ds1;ds2;ds3;ds4;ds5;ds6;ds7|]
         //[|ds4;ds3;ds67;ds5|]
         |> Seq.mapi (fun i ds -> printfn "ds%d" (i+1); ds)
